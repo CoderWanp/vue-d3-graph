@@ -1,4 +1,8 @@
-# vue-d3-graph项目介绍
+# vue-d3-graph
+
+基于之前的代码进行修改：[neo4j-d3-graph](https://github.com/CoderWanp/neo4j-d3-graph)
+
+目前只是最基础的版本，主要是提供代码的参考，后续会完善代码内容
 
 ## 依赖安装
 ```
@@ -24,8 +28,6 @@ yarn lint
 See [Configuration Reference](https://cli.vuejs.org/config/).
 
 ## 关于新版d3与老版本的差异
-
-[原jquery+d3构建的知识图谱页面](https://github.com/CoderWanp/neo4j-d3-graph)
 
 ### d3.event被移除
 
@@ -67,7 +69,7 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
   }
   ```
 
-  `export 'event' (imported as 'd3') was not found in 'd3'`
+  报错：`export 'event' (imported as 'd3') was not found in 'd3'`
 
 - 新版本（v6）
 

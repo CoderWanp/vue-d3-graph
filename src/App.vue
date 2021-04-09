@@ -1,8 +1,8 @@
 <template>
   <div id="app">
     <div id="nav">
-      <b>导航部分 => </b>
-      <router-link to="/">2D知识图谱</router-link> |
+      <b> 导航部分 </b> |
+      <router-link to="/"> 2D知识图谱</router-link> |
       <b>...</b>
       <!-- <router-link to="/about">3D知识图谱</router-link> -->
     </div>
