@@ -880,8 +880,9 @@ export default {
       
       function dragended(event) {
         if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
+        // 注释以下代码，使拖动结束后固定节点
+        // event.subject.fx = null;
+        // event.subject.fy = null;
       }
       
       return d3.drag()
