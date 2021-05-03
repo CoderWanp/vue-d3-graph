@@ -1,6 +1,5 @@
 <template>
   <div class="home">
-    <!-- <h1>简单的折线图</h1> -->
     <d3graph />
   </div>
 </template>

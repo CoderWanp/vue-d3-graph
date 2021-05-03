@@ -88,7 +88,7 @@ export default {
   props: {
     title: {
       type: String,
-      default: '知识图谱可视化'
+      default: '2D图谱展示'
     }
   },
   data () {
@@ -271,7 +271,7 @@ export default {
     update () {
       // console.log(this.graph.length)
       if (this.graph.length <= 20) {
-        this.graph = require('../data/records11.json')
+        this.graph = require('../data/top5.json')
       } else {
         this.graph = require('../data/records.json')
       }

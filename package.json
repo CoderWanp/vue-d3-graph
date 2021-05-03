@@ -8,6 +8,8 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "3d-force-graph": "^1.67.6",
+    "three-spritetext": "^1.5.3",
     "core-js": "^3.6.5",
     "d3": "^6.2.0",
     "d3-context-menu": "^1.1.2",
