@@ -4,22 +4,24 @@
 
 目前只是最基础的版本，主要是提供代码的参考，后续会完善代码内容
 
-## 依赖安装
+## 一、代码使用说明
+
+## 1. 依赖安装
 ```
 yarn install
 ```
 
-### 项目启动
+### 2. 项目启动
 ```
 yarn serve
 ```
 
-### 项目打包
+### 3. 项目打包
 ```
 yarn build
 ```
 
-### 使用lint检查并修复文件
+### 4. 使用lint检查并修复文件
 ```
 yarn lint
 ```
@@ -27,9 +29,38 @@ yarn lint
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
 
-## 关于新版d3与老版本的差异
+## 二、代码功能清单
 
-### d3.event被移除
+- d3初始化
+  - 数据解析
+  - 数据渲染
+- 图查询更新视图
+- 平移与缩放
+- 文字显示
+- 节点拖拽
+- 鼠标浮动事件
+- 鼠标单击事件
+- 鼠标右键菜单（写一个d3插件）
+- 图例交互事件
+- 文字搜索
+- 模式选择
+- 3D图谱展示
+
+## 三、代码效果展示
+
+分为2D、3D图谱展示两个页面：
+
+1. 2D图谱展示
+
+   ![2d](D:\临时用\my-github-code\vue-d3-graph\img\2d.png)
+
+2. 3D图谱展示
+
+   ![3d](D:\临时用\my-github-code\vue-d3-graph\img\3d.png)
+
+## 四、关于新版d3与老版本的差异
+
+### 1. d3.event被移除
 
 - 老版本（v4）
 
@@ -89,7 +120,7 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
   }
   ```
 
-### vue组件css不生效
+### 2. vue组件css不生效
 
 原因：添加了scoped，其通过d3动态添加的节点css样式不生效
 
