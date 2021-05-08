@@ -11,6 +11,12 @@
 </template>
 
 <style lang="scss">
+body {
+  margin: 0;
+  list-style: none;
+  text-decoration: none;
+  font-size: 100%;
+}
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -20,7 +26,8 @@
 }
 
 #nav {
-  padding: 30px;
+  margin: 5px;
+  padding: 20px;
 
   a {
     font-weight: bold;

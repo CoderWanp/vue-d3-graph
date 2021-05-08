@@ -1,7 +1,5 @@
 <template>
-  <div class="three-container">
-    <h1>3D图谱展示</h1>
-    <el-button style="margin-top: 15px;" @click="update">图数据切换，动态更新</el-button>
+  <div>
     <div id="3d-graph" class="three-graph"></div>
     <!-- 绘制图例 -->
     <div id="indicator">
@@ -17,12 +15,59 @@
     </div>
     <!-- 绘制右边显示结果 -->
     <div id="info" v-show="selectNodeData.name !== undefined">
-      <h4 :style="{ color: selectNodeData.color }">{{ selectNodeData.name }}</h4>
+      <!-- <h4 :style="{ color: selectNodeData.color }">{{ selectNodeData.name }}</h4>
       <p v-for="(item, key) in selectNodeData.properties" :key="item">
         <span>{{ key }}</span>
         {{ item }}
-      </p>
+      </p> -->
+      <el-card
+        :style="{ backgroundColor: selectNodeData.color }"
+        class="node-card"
+      >
+        <div slot="header" class="clearfix">
+          <span>{{ selectNodeData.name }}</span>
+          <el-button
+            @click="btnEdit"
+            style="float: right; padding: 3px 0;color: #409EFB;font-size: 15px;"
+            type="text"
+          >编辑</el-button>
+        </div>
+        <div
+          v-for="(item, key) in selectNodeData.properties" :key="item"
+        >
+          <span style="margin-right: 8px;">{{ (nodeObjMap[key] ? nodeObjMap[key] : key) + ':' }}</span>
+          <span style="text-align: right;"><b>{{ item }}</b></span>
+        </div>
+      </el-card>
     </div>
+    <!-- 编辑框 -->
+    <el-dialog :visible.sync="dialogFormVisible">
+      <el-form
+        :model="temp"
+        label-position="right"
+        label-width="86px"
+        style="width: 500px; margin-left:50px;"
+      >
+        <el-form-item
+          v-for="(value, key) in temp"
+          :key="key"
+          :label="nodeObjMap[key] ? nodeObjMap[key] : key"
+        >
+          <el-input
+            v-model="temp[key]"
+            :readonly="!isEdit"
+          />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="cancelEdit">
+          取消
+        </el-button>
+        <el-button type="primary" @click="doEdit">
+          确定
+        </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -32,6 +77,26 @@ import ForceGraph3D from '3d-force-graph'
 import SpriteText from 'three-spritetext'
 export default {
   name: 'threeGraph',
+  props: {
+    data: {
+      type: Object,
+      default: function () {
+        return {
+          nodes: [],
+          links: []
+        }
+      }
+    },
+    /* eslint-disable */
+    // 自定义图例（数组保证一一对应）
+    // names		图例名称变量制作图标
+    // labels		节点的标签名称（与records.json中保证相同）
+    names: {
+      type: Array
+    },
+    labels: Array,
+    linkTypes: Array
+  },
   mounted () {
     this.threeInit()
   },
@@ -39,18 +104,31 @@ export default {
     return {
       // ForceGraph3D对象，供全局调用，实现动态更新
       Graph: {},
-      // 根据graph数据的变化，threeRender()进行图形渲染
-      graph: require('../data/records.json'),
-      // neoJsonParser()处理graph后返回的结果
-      data: {},
       // threeRender()最终展示到页面上的数据（节点隐藏功能）
       nodes: [],
       links: [],
       // 图例的名称、对应的颜色以及图例状态
-      names: ['企业', '贸易类型', '地区', '国家'],
-      states: ['on', 'on', 'on', 'on'],
-      nodeColors: ['#55ffff', '#aaaaff', '#4e88af', '#ca635f'],
-      selectNodeData: {} // 选中节点的详细信息展示
+      states: [],
+      nodeColors: ['#55cccc', '#aaaaff', '#4e88af', '#ca635f','#FFC0CB', '#BA55D3', '#1E90FF', '#7FFFD4','#FFFF00'],
+      selectNodeData: {}, // 选中节点的详细信息展示
+      temp: {}, // 临时存储编辑时的节点信息
+      dialogFormVisible: false,
+      isEdit: true,
+      // 节点属性对应的标签名称
+      nodeObjMap: {
+        'address': '注册地址',
+        'captial': '注册资本',
+        'credit_code': '信用代码',
+        'name': '节点名称',
+        'setup_time': '注册日期'
+      }
+    }
+  },
+  watch: {
+    // 当请求到新的数据时，重新渲染
+    data (newData, oldData) {
+      console.log(newData, oldData)
+      this.threeInit()
     }
   },
   methods: {
@@ -76,49 +154,52 @@ export default {
       //   links: []
       // })
     },
+    // 编辑当前选中节点
+    btnEdit () {
+      this.temp = Object.assign({}, this.selectNodeData.properties) // copy obj
+      this.dialogFormVisible = true
+      console.log(this.selectNodeData)
+    },
+    doEdit () {
+      // console.log(this.data)
+      let i = 0
+      // 更新props的data 和 selectNodeData
+      this.selectNodeData.name = this.temp.name
+      this.selectNodeData.properties = this.temp
+      for (let node of this.data.nodes) {
+        // console.log(node.id === this.selectNodeData.id)
+        // console.log(node.id)
+        // console.log(this.selectNodeData.id)
+        if (node.id == this.selectNodeData.id) {
+          // this.$set(this.data.nodes, i, this.selectNodeData)
+          // this.$set(this.nodes, i, this.selectNodeData)
+          this.data.nodes[i].properties = this.temp
+          this.nodes[i].properties = this.temp
+          break
+        }
+        i++
+      }
+      this.dialogFormVisible = false
+      this.threeInit()
+      this.$message({
+        message: '更新成功',
+        type: 'success'
+      })
+    },
+    cancelEdit () {
+      this.dialogFormVisible = false
+    },
     // d3初始化，包括数据解析、数据渲染
     threeInit () {
-      this.neoJsonParser(this.graph)
+      this.links = this.data.links
+      this.nodes = this.data.nodes
       this.threeRender()
+      // 数据状态初始化
+      this.stateInit()
     },
-    /*eslint-disable*/
-    neoJsonParser (json) {
-      const nodes =[]
-      const links = [] // 存放节点和关系
-      const nodeSet = [] // 存放去重后nodes的id
-
-      for (let item of json) {
-        // console.log(item.p.start instanceof Array)
-        // console.log(item.p)
-        // 重新更改data格式
-        if(nodeSet.indexOf(item.p.start.identity) == -1){
-          nodeSet.push(item.p.start.identity)
-          nodes.push({
-            id: item.p.start.identity,
-            label: item.p.start.labels[0],
-            properties: item.p.start.properties
-          })
-        }
-        if(nodeSet.indexOf(item.p.end.identity) == -1){
-          nodeSet.push(item.p.end.identity)
-          nodes.push({
-            id: item.p.end.identity,
-            label: item.p.end.labels[0],
-            properties: item.p.end.properties
-          })
-        }
-        links.push({
-          source: item.p.segments[0].relationship.start,
-          target: item.p.segments[0].relationship.end,
-          type: item.p.segments[0].relationship.type,
-          properties: item.p.segments[0].relationship.properties
-        })
-      }
-      console.log(nodes)
-      console.log(links)
-      this.links = links
-      this.nodes = nodes
-      this.data = { nodes, links }
+    // 数据状态初始化
+    stateInit () {
+      this.states = Array(this.names.length).fill('on')
     },
     threeRender () {
       // DOM初始化及数据挂载
@@ -127,16 +208,16 @@ export default {
         .graphData(this.data)
 
       // 设置画布样式、节点及关系样式、事件绑定等
-      this.Graph.height(650).width(1200)
-        .backgroundColor('#000')
+      this.Graph.height(750).width(1200)
+        .backgroundColor('#9dadc1')
         // 节点样式和标签设置
         .nodeRelSize(7)
         .nodeColor(node => {
           let index = 0
           switch(node.label) {
-            case 'Enterprise': break;
-            case 'Type': index = 1;break;
-            case 'Region': index = 2;break;
+            case this.labels[0]: break;
+            case this.labels[1]: index = 1;break;
+            case this.labels[2]: index = 2;break;
             default: index = 3;break;
           }
           return this.nodeColors[index]
@@ -148,14 +229,17 @@ export default {
           const sprite = new SpriteText(node.properties.name)
           sprite.material.depthWrite = false // make sprite background transparent
           // 设置文字颜色
-          let index = 0
-          switch(node.label) {
-            case 'Enterprise': break;
-            case 'Type': index = 1;break;
-            case 'Region': index = 2;break;
-            default: index = 3;break;
+          let i = 0
+          // switch(node.label) {
+          //   case this.labels[0]: break;
+          //   case this.labels[1]: index = 1;break;
+          //   case this.labels[2]: index = 2;break;
+          //   default: index = 3;break;
+          // }
+          for (;i < this.labels.length;i++) {
+            if (node.label === this.labels[i]) break
           }
-          sprite.color = this.nodeColors[index]
+          sprite.color = this.nodeColors[i]
           sprite.textHeight = 8
           return sprite
         })
@@ -170,14 +254,18 @@ export default {
           this.$set(this.selectNodeData, 'id', node.id)
           this.$set(this.selectNodeData, 'name', node.properties.name)
           // 获取节点类型对应的颜色
-          let index = 0
-          switch(node.label) {
-            case 'Enterprise': break;
-            case 'Type': index = 1;break;
-            case 'Region': index = 2;break;
-            default: index = 3;break;
+          // let index = 0
+          // switch(node.label) {
+          //   case 'Enterprise': break;
+          //   case 'Type': index = 1;break;
+          //   case 'Region': index = 2;break;
+          //   default: index = 3;break;
+          // }
+          let i = 0
+          for (;i < this.labels.length;i++) {
+            if (node.label === this.labels[i]) break
           }
-          this.$set(this.selectNodeData, 'color', this.nodeColors[index])
+          this.$set(this.selectNodeData, 'color', this.nodeColors[i])
           this.$set(this.selectNodeData, 'properties', node.properties)
         })
         // 关系样式
@@ -203,7 +291,7 @@ export default {
         data
       })
     },
-    // 随机生成生成一个规模为N的图
+    // 随机生成一个规模为N的图
     createRandomGraph (N = 300) {
       return {
         nodes: [...Array(N).keys()].map(i => ({ id: i })),
@@ -220,63 +308,78 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.three-container {
-  position: relative;
-  border: 2px #000 solid;
-  background-color: #9dadc1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  overflow: hidden;
-  .three-graph {
-    width: 1200px;
-    height: 650px;
-    background-color: #000;
-    margin: 20px 0px;
-    border: 2px #fff solid;
+@media only screen and (max-width: 1200px){
+  #info, #indicator {
+    display: none !important;
   }
-  #indicator {
-    position: absolute;
-    left: 50px;
-    bottom: 30px;
+}
+.three-graph {
+  width: 1200px;
+  height: 750px;
+  // background-color: #000;
+  margin: 20px 0px;
+  // border: 2px #fff solid;
+}
+#indicator {
+  position: absolute;
+  // left: 50px;
+  // bottom: 30px;
+  left: 3vw;
+  bottom: 2vw;
+  text-align: left;
+  color: #f2f2f2;
+  font-size: 14px;
+  font-weight: bold;
+  & > div {
+    margin-bottom: 4px;
+  }
+  span {
+    display: inline-block;
+    width: 32px;
+    height: 16px;
+    position: relative;
+    top: 2px;
+    margin-right: 8px;
+  }
+}
+/*悬浮节点的info样式*/
+/*悬浮节点的info样式*/
+#info {
+  position: absolute;
+  bottom: 40px;
+  right: 30px;
+  width: 270px;
+  .node-card {
+    border: 1px solid #9faecf;
+    background-color: #00aeff6b;
+    color: #fff;
     text-align: left;
-    color: #f2f2f2;
-    font-size: 14px;
-    font-weight: bold;
-    & > div {
-      margin-bottom: 4px;
-    }
-    span {
-      display: inline-block;
-      width: 32px;
-      height: 16px;
-      position: relative;
-      top: 2px;
-      margin-right: 8px;
-    }
-  }
-  /*悬浮节点的info样式*/
-  #info {
-    position: absolute;
-    bottom: 40px;
-    right: 30px;
-    text-align: right;
-    width: 270px;
-    p {
-      color: #fff;
-      font-size: 12px;
-      margin-top: 0;
-      margin-bottom: 5px;
-    }
-    p span {
-      color: #888;
-      margin-right: 10px;
-    }
-    h4 {
-      color: #fff;
+    // transition: background-color;
+    // transition-delay: .3s;
+    // transition-timing-function: ease;
+    .el-card__header {
+      border-bottom: 1px solid #50596d;
     }
   }
 }
+// #info {
+//   position: absolute;
+//   bottom: 40px;
+//   right: 30px;
+//   text-align: right;
+//   width: 270px;
+//   p {
+//     color: #fff;
+//     font-size: 12px;
+//     margin-top: 0;
+//     margin-bottom: 5px;
+//   }
+//   p span {
+//     color: #888;
+//     margin-right: 10px;
+//   }
+//   h4 {
+//     color: #fff;
+//   }
+// }
 </style>

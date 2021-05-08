@@ -6,7 +6,7 @@
 
 ## 一、代码使用说明
 
-## 1. 依赖安装
+### 1. 依赖安装
 ```
 yarn install
 ```
@@ -46,17 +46,138 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 - 模式选择
 - 3D图谱展示
 
-## 三、代码效果展示
+## 三、代码修改说明
+
+### 1. 代码结构
+
+- **组件**存放在 `components` 文件夹
+  - `d3graph.vue` —— 2D图谱展示组件
+  - `threeGraph.vue` —— 3D图谱展示组件
+  - `gSearch.vue` —— 搜索组件，目前主要通过require代替后台请求
+- **页面**存放在 `views` 文件夹
+	- `2dView.vue`	——	2D图谱展示页面
+	- `3dView.vue`	——	3D图谱展示页面
+- **d3插件**存放在 `plugins` 文件夹
+	- `d3-context-menu.js` —— 右键菜单事件注册及回调函数
+	- `d3-context-menu.scss` —— 右键菜单样式文件
+- **路由**存放在 `router` 文件夹
+	- `index.js` —— 路由较少，就2个页面
+- **静态图数据**存放在 `data` 文件夹
+- `store` 和 `assets` 文件夹暂时不用
+
+### 2. 页面结构
+
+页面通过组件分为不同功能模块：
+
+1.  `2dView.vue`	—	**2D图谱展示页面**
+   - `d3graph.vue`
+     - 2D图谱展示组件
+   -  `gSearch.vue`
+     - 搜索组件
+     - 目前模拟后台请求，通过require代替
+2.  `3dView.vue`	—	**3D图谱展示页面**
+   - `threeGraph.vue`
+     - 3D图谱展示组件
+   -  `gSearch.vue`
+     - 搜索组件
+     - 目前模拟后台请求，通过require代替
+
+### 3. 在组件中修改代码，替换成自己构建的图谱
+
+- 图数据JSON格式要求
+
+  在Neo4j图数据中，以 **p** 为键值对表示，每个 **p** 为一个查询关系。
+
+  按如下Cypher查询语句导出均可以展示：
+
+  ```
+  MATCH p=(n:节点类型)-[r:关系类型]->() RETURN p limit 20
+  ```
+
+-  `gSearch.vue`
+
+  分别在data和methods属性中修改静态图数据文件的路径
+
+  ```js
+  data () {
+    return {
+      input: '',
+      mode: '1',
+      // 模拟后台请求到的json数据
+      data: require('../data/records.json'),
+      results: []
+    }
+  }
+  ```
+
+  ```js
+  methods: {
+    query () {
+      // 模拟后台查询时，图数据动态更新的情况（用静态文件暂时代替）
+      // console.log(typeof this.mode)
+      if (this.data.length <= 20) {
+        this.data = require('../data/top5.json')
+      } else {
+        this.data = require('../data/records.json')
+      }
+      this.$emit('getData', this.data)
+    },
+    // 省略其他函数...
+  }
+  ```
+
+- `d3graph.vue`
+
+  在data属性中修改映射，用于把标签名称转换为对应的中文名称
+
+  ```js
+  // 定义节点属性名称及对应显示的中文名称
+  nodeObjMap: {
+    'address': '注册地址',
+    'captial': '注册资本',
+    'credit_code': '信用代码',
+    'name': '节点名称',
+    'setup_time': '注册日期'
+  }
+  ```
+
+- `2dView.vue` 
+
+  在data属性中修改图例名称、节点标签、关系标签（标签保证和Neo4j图数据中对应）
+
+  ```js
+  data () {
+    return {
+      // d3jsonParser()处理 json 后返回的结果
+      data: {
+        nodes: [],
+        links: []
+      },
+      names: ['企业', '贸易类型', '地区', '国家'],
+      // 节点和关系标签名称与图数据库保持一致
+      labels: ['Enterprise', 'Type', 'Region', 'Country'],
+      linkTypes: ['', 'type', 'locate', 'export']
+    }
+  }
+  ```
+
+- `3dView.vue `
+
+  同上
+
+## 四、代码效果展示
+
+具体功能及效果可以参考本人博客：[vue+d3v6实现动态知识图谱可视化展示](https://blog.csdn.net/tiandao451/article/details/109708427)
 
 分为2D、3D图谱展示两个页面：
 
 1. 2D图谱展示
 
-   ![2d](D:\临时用\my-github-code\vue-d3-graph\img\2d.png)
+   ![2d](.\img\2d.png)
 
 2. 3D图谱展示
 
-   ![3d](D:\临时用\my-github-code\vue-d3-graph\img\3d.png)
+   ![3d](.\img\3d.png)
 
 ## 四、关于新版d3与老版本的差异
 

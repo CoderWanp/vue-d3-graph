@@ -1,24 +1,12 @@
 <template>
-  <div class="graph">
-    <h1>{{ title }}</h1>
-    <el-button style="margin-top: 15px;" @click="update">图数据切换，动态更新</el-button>
-    <!-- <div style="margin-top: 15px;width: 500px;">
-      <el-input placeholder="请输入内容" v-model="input" class="input-with-select">
-        <el-select v-model="mode" slot="prepend" placeholder="关键字查询">
-          <el-option label="关键字查询" value="1"></el-option>
-          <el-option label="单实体查询" value="2"></el-option>
-          <el-option label="关联查询" value="3"></el-option>
-        </el-select>
-        <el-button slot="append" type="success" icon="el-icon-search">搜索</el-button>
-      </el-input>
-    </div> -->
+  <div>
     <!-- 绘制模式选择 -->
     <div id="mode">
-      <h4>文字搜索</h4>
-      <div style="margin-bottom: 20px;">
+      <h3>文字搜索</h3>
+      <div class="gState" style="margin-bottom: 20px;">
         <span
-          @click="changeNodeState(0)"
-          :class="{ active: modeSpanActive }"
+          @click="changeTextState(0)"
+          :class="{ active: isShowText }"
           style="border-top-right-radius:0;border-bottom-right-radius:0;"
         >显示</span>
         <!-- <span
@@ -27,32 +15,29 @@
           style="border-top-left-radius:0;border-bottom-left-radius:0;position:relative;left:-5px;"
         >关系(度)</span> -->
         <span
-          @click="changeNodeState(2)"
-          :class="{ active: nodeState === 2 }"
+          @click="changeTextState(2)"
+          :class="{ active: textState === 2 }"
           style="border-top-left-radius:0;border-bottom-left-radius:0;position:relative;left:-5px;"
         >隐藏</span>
       </div>
-      <el-input @input="searchKeyWords" v-model="keywords" placeholder="请输入内容" />
-      <p style="text-align: left;">
+      <el-input @input="searchKeyWords" v-model="keywords" clearable placeholder="请输入内容" />
+      <p class="font-sky" style="text-align: left;">
         <strong>节点个数：{{ nodes.length }}</strong>
         <br>
         <strong>关系个数：{{ links.length }}</strong>
         <br>
-        <strong>图密度：{{ (links.length / (nodes.length * (nodes.length - 1))).toFixed(3) }}</strong>
+        <strong>平均度数：{{ gDegree }}</strong>
         <br>
-        <strong>平均度数：{{ (links.length / nodes.length).toFixed(3) }}</strong>
+        <strong>图密度：{{ gDensity }}</strong>
+        <br>
+        <strong>稀疏度：{{ gSparsity }}</strong>
       </p>
     </div>
-    <!-- <div
-      class="showContainer"
-      style="width: 1200px;height: 800px;"
-    > -->
-      <svg
-        id="svg1"
-        width="1100"
-        height="650"
-      ></svg>
-    <!-- </div> -->
+    <svg
+      id="svg"
+      width="1200"
+      height="750"
+    ></svg>
     <!-- 绘制图例 -->
     <div id="indicator">
       <!-- 利用item 遍历一个数组 利用index 遍历另外一个数组 -->
@@ -69,12 +54,59 @@
     </div>
     <!-- 绘制右边显示结果 -->
     <div id="info" v-show="selectNodeData.name !== undefined">
-      <h4 :style="{ color: selectNodeData.color }">{{ selectNodeData.name }}</h4>
+      <!-- <h4 :style="{ color: selectNodeData.color }">{{ selectNodeData.name }}</h4>
       <p v-for="(item, key) in selectNodeData.properties" :key="item">
         <span>{{ key }}</span>
         {{ item }}
-      </p>
+      </p> -->
+      <el-card
+        :style="{ backgroundColor: selectNodeData.color }"
+        class="node-card"
+      >
+        <div slot="header" class="clearfix">
+          <span>{{ selectNodeData.name }}</span>
+          <el-button
+            @click="btnEdit"
+            style="float: right; padding: 3px 0;color: #409EFB;font-size: 15px;"
+            type="text"
+          >编辑</el-button>
+        </div>
+        <div
+          v-for="(item, key) in selectNodeData.properties" :key="item"
+        >
+          <span style="margin-right: 8px;">{{ (nodeObjMap[key] ? nodeObjMap[key] : key) + ':' }}</span>
+          <span style="text-align: right;"><b>{{ item }}</b></span>
+        </div>
+      </el-card>
     </div>
+    <!-- 编辑框 -->
+    <el-dialog :visible.sync="dialogFormVisible">
+      <el-form
+        :model="temp"
+        label-position="right"
+        label-width="86px"
+        style="width: 500px; margin-left:50px;"
+      >
+        <el-form-item
+          v-for="(value, key) in temp"
+          :key="key"
+          :label="nodeObjMap[key] ? nodeObjMap[key] : key"
+        >
+          <el-input
+            v-model="temp[key]"
+            :readonly="!isEdit"
+          />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="cancelEdit">
+          取消
+        </el-button>
+        <el-button type="primary" @click="doEdit">
+          确定
+        </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -82,33 +114,44 @@
 import * as d3 from 'd3'
 import install from '@/plugins/d3-context-menu'
 install(d3) // 为d3注册右键菜单插件
-// console.log(d3.contextMenu)
 export default {
   name: 'd3graph',
   props: {
-    title: {
-      type: String,
-      default: '2D图谱展示'
-    }
+    data: {
+      type: Object,
+      default: function () {
+        return {
+          nodes: [],
+          links: []
+        }
+      }
+    },
+    /* eslint-disable */
+    // 自定义图例（数组保证一一对应）
+    // names		图例名称变量制作图标
+    // labels		节点的标签名称（与records.json中保证相同）
+    names: {
+      type: Array
+    },
+    labels: Array,
+    linkTypes: Array
   },
   data () {
     return {
-      input: '',
-      // mode: '',
+      svgDom: null, // svg的DOM元素 => d3.select('#svg1')
       keywords: '',
-      // 节点状态，表示节点显示的文本信息（名称、度）
       nodeState: 0,
-      // 根据graph数据的变化，d3render()进行图形渲染
-      graph: require('../data/records.json'),
-      // d3jsonParser()处理graph后返回的结果
-      data: {},
+      // 文本状态，表示是否显示文本信息（0：显示/1：不显示）
+      textState: 0,
       // d3render()最终展示到页面上的数据（节点隐藏功能）
       nodes: [],
       links: [],
-      // 图例的名称、对应的颜色以及图例状态
-      names: ['企业', '贸易类型', '地区', '国家'],
-      colors: ['#55ffff', '#aaaaff', '#4e88af', '#ca635f'],
-      states: ['on', 'on', 'on', 'on'],
+      /* eslint-disable */
+      // 自定义图例及颜色（数组保证一一对应）
+      // colors		图例颜色（9个颜色）
+      // states   图例状态（on：显示 / off：不显示）
+      colors: ['#55cccc', '#aaaaff', '#4e88af', '#ca635f','#FFC0CB', '#BA55D3', '#1E90FF', '#7FFFD4','#FFFF00'],
+      states: [],
       selectNodeData: {}, // 选中节点的详细信息展示
       isNodeClicked: false, // 是否点击（选中）节点
       // 用于位置、大小矫正（暂不使用）
@@ -131,6 +174,7 @@ export default {
               else return true
             })
             this.d3render() // 重新渲染图
+            this.stateInit()
           },
           disabled: false // optional, defaults to false
         },
@@ -142,7 +186,7 @@ export default {
             this.nodes = this.data.nodes.filter(node => {
               if (node.id === d.id) return true
               else {
-                for (var i = 0; i < this.links.length; i++) {
+                for (var i = 0; i < this.data.links.length; i++) {
                   // 如果links的起点等于name，并且终点等于正在处理的则显示
                   if (this.data.links[i].source.id === node.id && this.data.links[i].target.id === d.id) {
                     return true
@@ -160,6 +204,7 @@ export default {
               else return false
             })
             this.d3render() // 重新渲染图
+            this.stateInit()
           }
         },
         {
@@ -169,30 +214,121 @@ export default {
             // 遍历保留节点的关联关系
             this.links = this.data.links
             this.d3render() // 重新渲染图
+            this.stateInit()
           }
         }
-      ]
+      ],
+      temp: {}, // 临时存储编辑时的节点信息
+      dialogFormVisible: false,
+      isEdit: true,
+      // 节点属性对应的标签名称
+      nodeObjMap: {
+        'address': '注册地址',
+        'captial': '注册资本',
+        'credit_code': '信用代码',
+        'name': '节点名称',
+        'setup_time': '注册日期'
+      }
     }
   },
   computed: {
-    modeSpanActive: function () {
+    isShowNode: function () {
       // `this` 指向 vm 实例
       return this.nodeState === 0
+    },
+    isShowText: function () {
+      // `this` 指向 vm 实例
+      return this.textState === 0
+    },
+    gDensity () {
+      return this.nodes.length <= 1 ? 0 : (this.links.length / (this.nodes.length * (this.nodes.length - 1))).toFixed(2)
+    },
+    gDegree () {
+      return (this.links.length / this.nodes.length).toFixed(2)
+    },
+    // 企业实体的平均度数
+    gMainDegree () {
+      // 遍历节点
+      // this.nodes.forEach(node => {
+      //   
+      // })
+      // // 遍历关系
+      // this.links.forEach(link => {
+      //   
+      // })
+    },
+    // 稀疏度
+    gSparsity () {
+      return (this.links.length / (this.nodes.length * Math.log(this.nodes.length))).toFixed(2)
     }
   },
+  watch: {
+    // 当请求到新的数据时，重新渲染
+    data (newData, oldData) {
+      console.log(newData, oldData)
+      // 移除svg和元素注册事件，防止内存泄漏
+      this.svgDom.on('.', null)
+      this.svgDom.selectAll('*').on('.', null)
+      this.d3init()
+    }
+  },
+  created () {
+    // this.states = Array(this.names.length).fill('on')
+  },
   mounted () {
-    // console.log(this.$el)
     this.d3init()
   },
+  beforeDestroy () {
+    // 移除svg和元素注册事件，防止内存泄漏
+    this.svgDom.on('.', null)
+    this.svgDom.selectAll('*').on('.', null)
+  },
   methods: {
-    changeNodeState (state) {
+    // 编辑当前选中节点
+    btnEdit () {
+      this.temp = Object.assign({}, this.selectNodeData.properties) // copy obj
+      this.dialogFormVisible = true
+      console.log(this.selectNodeData)
+    },
+    doEdit () {
+      // console.log(this.data)
+      let i = 0
+      // 更新props的data 和 selectNodeData
+      this.selectNodeData.name = this.temp.name
+      this.selectNodeData.properties = this.temp
+      for (let node of this.data.nodes) {
+        // console.log(node.id === this.selectNodeData.id)
+        // console.log(node.id)
+        // console.log(this.selectNodeData.id)
+        if (node.id == this.selectNodeData.id) {
+          // this.$set(this.data.nodes, i, this.selectNodeData)
+          // this.$set(this.nodes, i, this.selectNodeData)
+          this.data.nodes[i].properties = this.temp
+          this.nodes[i].properties = this.temp
+          break
+        }
+        i++
+      }
+      this.dialogFormVisible = false
+      this.d3init()
+      this.$message({
+        message: '更新成功',
+        type: 'success'
+      })
+    },
+    cancelEdit () {
+      this.dialogFormVisible = false
+    },
+    // 隐藏文字
+    changeTextState (state) {
       // state发生变化时才进行更新、处理
-      if (this.nodeState !== state) {
-        this.nodeState = state
-        const text = d3.selectAll('.texts text')
+      if (this.textState !== state) {
+        this.textState = state
+        // const text = d3.selectAll('.texts text')
+        const text = d3.selectAll('.linkTexts text')
         console.log(text)
         // 根据新的节点状态，在节点上展示不同的文本信息
-        if (this.nodeState === 2) {
+        if (this.textState === 2) {
           text.style('display', 'none')
           // 暂不作校准
           // // transform属性数值化
@@ -218,80 +354,72 @@ export default {
         }
       }
     },
-    // 隐藏该类型的所有节点
+    // 隐藏该类型的所有节点（图例）
     hideNodeOfType (event) {
-      // console.log(event.target.dataset)
-      const index = event.target.dataset.index
-      const state = event.target.dataset.state
-      const nodeTypes = ['Enterprise', 'Type', 'Region', 'Country']
-      const linkTypes = ['', 'type', 'locate', 'export']
-      // 图例的状态切换（对应类型的节点隐藏）
-      if (state === 'on') {
-        // 隐藏该类型的所有节点及关联关系
-        // this.states[index] = 'off'
-        this.$set(this.states, index, 'off')
-      } else {
-        // this.states[index] = 'on'
-        this.$set(this.states, index, 'on')
-      }
-      /**************************************
-       * 状态更新后，同时对数据更新
-       */
-      const indexs = this.states.map(s => {
-        if (s === 'on') {
-          return '1'
+      if (this.nodes.length === this.data.nodes.length 
+        || this.states.some((state) => state === 'off')) {
+        // console.log(event.target.dataset)
+        const index = event.target.dataset.index
+        const state = event.target.dataset.state
+        // const nodeTypes = ['Enterprise', 'Type', 'Region', 'Country']
+        // const linkTypes = ['', 'type', 'locate', 'export']
+        // 图例的状态切换（对应类型的节点隐藏）
+        if (state === 'on') {
+          // 隐藏该类型的所有节点及关联关系
+          // this.states[index] = 'off'
+          this.$set(this.states, index, 'off')
         } else {
-          return '0'
+          // this.states[index] = 'on'
+          this.$set(this.states, index, 'on')
         }
-      })
-      // 遍历删除节点
-      this.nodes = this.data.nodes.filter(node => {
-        for (let i = 0; i < indexs.length; i++) {
-          if (node.label === nodeTypes[i] && indexs[i] === '0') return false
-        }
-        return true
-      })
-      // 遍历删除关系
-      this.links = this.data.links.filter(link => {
-        for (let i = 0; i < indexs.length; i++) {
-          if (i === 0 && indexs[i] === '0') return false
-          else if (link.type === linkTypes[i] && indexs[i] === '0') return false
-        }
-        return true
-      })
-      // 调试时使用
-      // console.log(indexs)
-      // console.log(this.data.nodes.length, this.data.links.length)
-      // console.log(this.nodes.length)
-      // console.log(this.links.length)
-      // 重新渲染
-      this.d3render()
-    },
-    // 视图更新
-    update () {
-      // console.log(this.graph.length)
-      if (this.graph.length <= 20) {
-        this.graph = require('../data/top5.json')
+        /**************************************
+         * 状态更新后，同时对数据更新
+         */
+        const indexs = this.states.map(s => {
+          if (s === 'on') {
+            return '1'
+          } else {
+            return '0'
+          }
+        })
+        // 遍历删除节点
+        this.nodes = this.data.nodes.filter(node => {
+          for (let i = 0; i < indexs.length; i++) {
+            if (node.label === this.labels[i] && indexs[i] === '0') return false
+          }
+          return true
+        })
+        // 遍历删除关系
+        this.links = this.data.links.filter(link => {
+          for (let i = 0; i < indexs.length; i++) {
+            if (i === 0 && indexs[i] === '0') return false
+            else if (link.type === this.linkTypes[i] && indexs[i] === '0') return false
+          }
+          return true
+        })
+        // 调试时使用
+        // console.log(indexs)
+        // console.log(this.data.nodes.length, this.data.links.length)
+        // console.log(this.nodes.length)
+        // console.log(this.links.length)
+        // 重新渲染
+        this.d3render()
       } else {
-        this.graph = require('../data/records.json')
+        this.$message.error('展示全部节点时才能隐藏图例')
       }
-      this.d3init()
     },
     /*eslint-disable*/
     // 搜索包含关键字的节点
     searchKeyWords (value) {
-      console.log('keyup event! => ' + value)
       // 如果Input值是空的显示所有的圆和线(没有进行筛选)
       if (this.keywords === '') {
-        // d3.select('#svg1 .texts').selectAll('text').attr('class', '')
-        d3.select('#svg1 .nodes').selectAll('circle').attr('class', '')
-        d3.select('#svg1 .links').selectAll('line').attr('class', '')
+        this.clearGraphStyle()
       }
       // 否则判断判断三个元素是否等于name值，等于则显示该值
       else {
         var name = this.keywords
         // 搜索所有的节点
-        d3.select('#svg1 .nodes').selectAll('circle').attr('class', (d) => {
+        this.svgDom.select('.nodes').selectAll('circle').attr('class', d => {
           // 输入节点id的小写等于name则显示，否则隐藏
           if (d.properties.name.indexOf(name) >= 0) {
               return 'fixed'
@@ -315,30 +443,40 @@ export default {
           }
         })
         // 搜索texts
-        // d3.select('#svg1 .texts').selectAll('text').attr('class', (d) => {
-        //   if (d.properties.name.indexOf(name) >= 0) {
-        //       return ''
-        //   } else {
-        //     // 优化：与该搜索节点相关联的节点均显示
-        //     // links链接的起始节点进行判断,如果其id等于name则显示这类节点
-        //     for (var i = 0; i < this.links.length; i++) {
-        //     // 如果links的起点等于name，并且终点等于正在处理的则显示
-        //       if ((this.links[i]['source'].properties.name.indexOf(name) >= 0) && 
-        //         (this.links[i]['target'].id == d.id)) {
-        //           return ''
-        //       }
-        //       //如果links的终点等于name，并且起点等于正在处理的则显示
-        //       if ((this.links[i]['target'].properties.name.indexOf(name) >= 0) && 
-        //         (this.links[i]['source'].id == d.id)) {
-        //         return ''
-        //       }
-        //     }
-        //     return 'inactive'
-        //   }
-        // })
+        this.svgDom.select('.texts').selectAll('text').attr('class', d => {
+          if (d.properties.name.indexOf(name) >= 0) {
+              return ''
+          } else {
+            // 优化：与该搜索节点相关联的节点均显示
+            // links链接的起始节点进行判断,如果其id等于name则显示这类节点
+            for (var i = 0; i < this.links.length; i++) {
+            // 如果links的起点等于name，并且终点等于正在处理的则显示
+              if ((this.links[i]['source'].properties.name.indexOf(name) >= 0) && 
+                (this.links[i]['target'].id == d.id)) {
+                  return ''
+              }
+              //如果links的终点等于name，并且起点等于正在处理的则显示
+              if ((this.links[i]['target'].properties.name.indexOf(name) >= 0) && 
+                (this.links[i]['source'].id == d.id)) {
+                return ''
+              }
+            }
+            return 'inactive'
+          }
+        })
         // 搜索links
         // 显示相的邻边 注意 || 
-        d3.select("#svg1 .links").selectAll('line').attr('class', (d) => {
+        this.svgDom.select(".links").selectAll('line').attr('class', d => {
+          if ((d.source.properties.name.indexOf(name) >= 0) || 
+            (d.target.properties.name.indexOf(name) >= 0) 
+            ) {
+              return ''
+            } else {
+              return 'inactive' //隐藏
+            }
+        })
+        // 搜索linkTexts
+        this.svgDom.select(".linkTexts").selectAll('text').attr('class', d => {
           if ((d.source.properties.name.indexOf(name) >= 0) || 
             (d.target.properties.name.indexOf(name) >= 0) 
             ) {
@@ -351,81 +489,41 @@ export default {
     },
     // d3初始化，包括数据解析、数据渲染
     d3init () {
-      this.d3jsonParser(this.graph)
+      this.links = this.data.links
+      this.nodes = this.data.nodes
+      this.svgDom = d3.select('#svg')  // 获取svg的DOM元素
+      // this.d3jsonParser(this.graph)
       this.d3render()
-      // 数据初始化
-      this.nodeState = 0
-      this.states = ['on', 'on', 'on', 'on']
+      // 数据状态初始化
+      this.stateInit()
     },
-    /*eslint-disable*/
-    d3jsonParser (json) {
-      const nodes =[]
-      const links = [] // 存放节点和关系
-      const nodeSet = [] // 存放去重后nodes的id
-
-      // 使用vue直接通过require获取本地json，不再需要使用d3.json获取数据
-      // d3.json('./../data/records.json', function (error, data) {
-      //   if (error) throw error
-      //   graph = data
-      //   console.log(graph[0].p)
-      // })
-
-      for (let item of json) {
-        for (let segment of item.p.segments) {
-          // 重新更改data格式
-          if (nodeSet.indexOf(segment.start.identity) == -1) {
-            nodeSet.push(segment.start.identity)
-            nodes.push({
-              id: segment.start.identity,
-              label: segment.start.labels[0],
-              properties: segment.start.properties
-            })
-          }
-          if (nodeSet.indexOf(segment.end.identity) == -1) {
-            nodeSet.push(segment.end.identity)
-            nodes.push({
-              id: segment.end.identity,
-              label: segment.end.labels[0],
-              properties: segment.end.properties
-            })
-          }
-          links.push({
-            source: segment.relationship.start,
-            target: segment.relationship.end,
-            type: segment.relationship.type,
-            properties: segment.relationship.properties
-          })
-        }
-      }
-      console.log(nodes)
-      console.log(links)
-      this.links = links
-      this.nodes = nodes
-      this.data = { nodes, links }
-      // return { nodes, links }
+    // 数据状态初始化
+    stateInit () {
+      this.nodeState = 0
+      this.textState = 0
+      // console.log(this.names)
+      this.states = Array(this.names.length).fill('on')
     },
     d3render () {
       var _this = this // 临时获取Vue实例，避免与d3的this指针冲突
 
       // 渲染前清空svg内的元素
-      d3.select("#svg1").selectAll('*').remove()
+      _this.svgDom.selectAll('*').remove()
       // svg.selectAll('g').remove()
 
-      var svg = d3.select("#svg1")
+      var svg = _this.svgDom
         .on('click', () => { 
-          console.log(this.isNodeClicked)
+          // console.log(this.isNodeClicked)
           this.isNodeClicked = false
           // 移除所有样式
-          d3.select('#svg1 .nodes').selectAll('circle').attr('class', '')
-          d3.select('#svg1 .links').selectAll('line').attr('class', '')
-          // d3.select(this).attr('class', '')
+          this.clearGraphStyle()
           // 如果此时有搜索关键字，则鼠标离开时保留原搜索选中的节点
           if(this.keywords !== '') {
             this.searchKeyWords()
           }
         })
         // 给画布绑定zoom事件（缩放、平移）
-        .call(d3.zoom().on('zoom', function(event) {
+        .call(d3.zoom().on('zoom', event => {
           // console.log(event)
           var scale = event.transform.k,
               translate = [event.transform.x, event.transform.y]
@@ -445,6 +543,7 @@ export default {
         .attr('width', '100%')
         .attr('height', '100%')
         
+      this.addMarkers()
       // console.log(svg)
       // 动态变化时，不再固定宽高
 			// var width = svg.attr("width"),
@@ -458,16 +557,14 @@ export default {
 
       // 定义碰撞检测模型
       var forceCollide = d3.forceCollide()
-        .radius(function(d){
-          return 16 * 2.2
-        })
+        .radius(d => { return 16 * 3 })
         .iterations(0.15)
         .strength(0.75)
 
       // 利用d3.forceSimulation()定义关系图 包括设置边link、排斥电荷charge、关系图中心点
       var simulation = d3.forceSimulation(this.nodes)
         .force("link", d3.forceLink().id(d => d.id))
-        .force("charge", d3.forceManyBody().strength(-500))
+        .force("charge", d3.forceManyBody().strength(-100))
         // .force("center", d3.forceCenter(width / 2, height / 2)
         .force("center", d3.forceCenter(svg.node().parentElement.clientWidth / 2, svg.node().parentElement.clientHeight / 2))
         .force("collision", forceCollide)
@@ -475,42 +572,61 @@ export default {
       // D3映射数据至HTML中
       // g用于绘制所有边,selectALL选中所有的line,并绑定数据data(graph.links),enter().append("line")添加元素
       // 数据驱动文档,设置边的粗细
-      var link = svg.append("g").attr("class","links").selectAll("line").data(this.links).enter()
-        .append("line").attr("stroke-width", function(d) {
+      var link = svg.append("g")
+        .attr("class", "links")
+        .selectAll("line")
+        .data(this.links).enter()
+        .append("line")
+        .attr("stroke-width", function(d) {
           // 每次访问links的一项数据
           return 2 //所有线宽度均为2
         })
+        .join("path")
+        .attr("marker-end", "url(#posMarker)")
       
+      var linksName = svg.append("g")
+        .attr("class", "linkTexts")
+        .selectAll("text")
+        .data(this.links)
+        .join("text")
+        .style('text-anchor','middle')
+        .style('fill', '#fff')
+        .style('font-size', '12px')
+        // .style('font-weight', 'bold')
+        .text(d => d.properties.name)
+
+      // linksName
+      //   .append('textPath')
+      //   .attr('xlink:href', d => '#')
+      //   .attr('startOffset', '50%')
+        
       // 添加所有的点
       // selectAll("circle")选中所有的圆并绑定数据,圆的直径为d.size
       // 再定义圆的填充色,同样数据驱动样式,圆没有描边,圆的名字为d.id
       // call()函数：拖动函数,当拖动开始绑定dragstarted函数，拖动进行和拖动结束也绑定函数
-      var node = svg.append("g").attr("class", "nodes").selectAll("circle").data(this.nodes).enter()
+      var node = svg.append("g")
+        .attr("class", "nodes")
+        .selectAll("circle")
+        .data(this.nodes).enter()
         .append("circle").attr("r", function(d) {
           // 每次访问nodes的一项数据
           // console.log(d)
           let size = 16
           switch(d.label){
-            case 'Enterprise': break;
-            case 'Type': size = 14; break;
-            case 'Region': size = 13; break;
+            case _this.labels[0]: break;
+            case _this.labels[1]: size = 14; break;
+            case _this.labels[2]: size = 13; break;
             default: size = 13; break;
           }
           return size * 2
         })
         .attr("fill", d => {
-          let index = 0
-          switch(d.label){
-            case 'Enterprise': break;
-            case 'Type': index = 1; break;
-            case 'Region': index = 2; break;
-            default: index = 3; break;
+          for (let i = 0;i < this.labels.length;i++) {
+            if (d.label === this.labels[i]) return this.colors[i]
           }
-          return this.colors[index]
         })
-        .attr("stroke", "none").attr("name", function(d) {
-          return d.properties.name
-        })
+        .attr("stroke", "none")
+        .attr("name", d => d.properties.name)
         .attr("id", d => d.id)
         .call(this.drag(simulation))
         .on("click", nodeClick)
@@ -537,43 +653,13 @@ export default {
               _this.$set(_this.selectNodeData, 'properties', item.properties)
             }
           }
-          // 选择#svg1 .nodes中所有的circle，再增加个class
-          d3.select('#svg1 .nodes').selectAll('circle').attr('class', function(d) {
-            // 节点属性name是否等于name，返回fixed（激活选中样式）
-            if(d.properties.name == name) {
-              return 'fixed'
-            }
-            // 当前节点返回空，否则其他节点循环判断是否被隐藏起来(CSS设置隐藏)
-            else {
-              // links链接的起始节点进行判断,如果其id等于name则显示这类节点
-              // 注意: graph = data
-              for (var i = 0; i < _this.links.length; i++) {
-                //如果links的起点等于name，并且终点等于正在处理的则显示
-                if (_this.links[i]['source'].properties.name == name && _this.links[i]['target'].id == d.id) {
-                    return 'active'
-                }
-                if (_this.links[i]['target'].properties.name == name && _this.links[i]['source'].id == d.id) {
-                    return 'active'
-                }
-              }
-              return _this.isNodeClicked ? 'inactive' : '' // 前面CSS定义 .nodes circle.inactive
-            }
-          })
-          //处理相邻的边line是否隐藏 注意 || 
-          d3.select("#svg1 .links").selectAll('line').attr('class', function(d) {
-              if (d.source.properties.name == name || d.target.properties.name == name) {
-                  return 'active'
-              } else {
-                  return _this.isNodeClicked ? 'inactive' : ''
-              }
-          })
+          // 遍历节点，并调整图的样式
+          _this.changeGraphStyle(name)
         })
-        .on('mouseleave', (event) => {
+        .on('mouseleave', event => {
           console.log(this.isNodeClicked)
           if (!this.isNodeClicked) {
-            d3.select('#svg1 .nodes').selectAll('circle').attr('class', '')
-            d3.select('#svg1 .links').selectAll('line').attr('class', '')
-            // d3.select(this).attr('class', '')
+            this.clearGraphStyle()
             // 如果此时有搜索关键字，则鼠标离开时保留原搜索选中的节点
             if(this.keywords !== '') {
               this.searchKeyWords()
@@ -600,15 +686,9 @@ export default {
         .selectAll("text")
         .data(this.nodes)
         .enter()
-        .append("text").attr("font-size", function(d) {
-          return 13
-        })
-        .attr("fill", function(d) {
-          return '#fff'
-        })
-        .attr('name', function(d) {
-            return d.properties.name
-        })
+        .append("text").attr("font-size", () => 13)
+        .attr("fill", () => '#fff')
+        .attr('name', d => d.properties.name)
         .attr("text-anchor", "middle")
         .attr('x', function (d) {
           return textBreaking(d3.select(this), d.properties.name)
@@ -632,50 +712,19 @@ export default {
               // 根据节点类型label获取节点颜色
               let index = 0
               switch (item.label) {
-                case 'Enterprise': break;
-                case 'Type': index = 1;break;
-                case 'Region': index = 2;break;
+                case _this.labels[0]: break;
+                case _this.labels[1]: index = 1;break;
+                case _this.labels[2]: index = 2;break;
                 default: index = 3;break;
               }
               _this.$set(_this.selectNodeData, 'color', _this.colors[index])
             }
           }
-          // 选择#svg1 .nodes中所有的circle，再增加个class
-          d3.select('#svg1 .nodes').selectAll('circle').attr('class', function(d) {
-            // 数据的id是否等于name,返回空
-            if(d.properties.name == name) {
-              return 'fixed'
-            } 
-            // 当前节点返回空，否则其他节点循环判断是否被隐藏起来(CSS设置隐藏)
-            else {
-              // links链接的起始节点进行判断,如果其id等于name则显示这类节点
-              // 注意: graph=data
-              for (var i = 0; i < _this.links.length; i++) {
-                // 如果links的起点等于name，并且终点等于正在处理的则显示
-                if (_this.links[i]['source'].properties.name == name && _this.links[i]['target'].id == d.id) {
-                    return 'active'
-                }
-                if (_this.links[i]['target'].properties.name == name && _this.links[i]['source'].id == d.id) {
-                    return 'active'
-                }
-              }
-              return _this.isNodeClicked ? 'inactive' : '' //前面CSS定义 .nodes circle.inactive
-            }
-          })
-          //处理相邻的边line是否隐藏 注意 || 
-          d3.select("#svg1 .links").selectAll('line').attr('class', function(d) {
-              if (d.source.properties.name == name || d.target.properties.name == name) {
-                  return 'active'
-              } else {
-                  return _this.isNodeClicked ? 'inactive' : ''
-              }
-          })
+          _this.changeGraphStyle(name)
         })
         .on('mouseleave', (event) => {
           if(!this.isNodeClicked) {
-            d3.select('#svg1 .nodes').selectAll('circle').attr('class', '')
-            d3.select('#svg1 .links').selectAll('line').attr('class', '')
-            // d3.select(this).attr('class', '')
+            this.clearGraphStyle()
             // 如果此时有搜索关键字，则鼠标离开时保留原搜索选中的节点
             if(this.keywords !== '') {
               this.searchKeyWords()
@@ -698,25 +747,25 @@ export default {
       simulation.force("link")
         .links(this.links)
         .distance(d => { // 每一边的长度
-          let distance = 10
+          let distance = 20
           switch(d.source.label) {
-            case 'Enterprise': distance += 30;break;
-            case 'Type': distance += 25;break;
-            case 'Region': distance += 22;break;
+            case _this.labels[0]: distance += 30;break;
+            case _this.labels[1]: distance += 25;break;
+            case _this.labels[2]: distance += 22;break;
             default: distance += 20;break; 
           }
           switch(d.target.label) {
-            case 'Enterprise': distance += 30;break;
-            case 'Type': distance += 25;break;
-            case 'Region': distance += 22;break;
+            case _this.labels[0]: distance += 30;break;
+            case _this.labels[1]: distance += 25;break;
+            case _this.labels[2]: distance += 22;break;
             default: distance += 20;break; 
           }
-          return distance * 1.2
+          return distance * 2
         })
       
       /****************************************** 
        * 内部功能函数
-       * 包括：拖动、
+       * 包括：ticked、文本分隔、节点和文本的点击事件
        */
       // ticked()函数确定link线的起始点x、y坐标 node确定中心点 文本通过translate平移变化
       function ticked() {
@@ -726,6 +775,32 @@ export default {
           .attr("x2", d => d.target.x)
           .attr("y2", d => d.target.y)
     
+        linksName
+          .attr('transform', d => {
+            let x = Math.min(d.source.x, d.target.x) + Math.abs(d.source.x - d.target.x) / 2
+            let y = Math.min(d.source.y, d.target.y) + Math.abs(d.source.y - d.target.y) / 2 - 1
+            // tanA = a / b
+            // A = arctan(tanA)
+            let tanA = Math.abs(d.source.y - d.target.y) / Math.abs(d.source.x - d.target.x)
+            let angle = Math.atan(tanA) / Math.PI * 180
+            // let angle = Math.atan2(1,1)/Math.PI*180
+            // console.log(angle)
+            // 第一、二象限额外处理
+            if (d.source.x > d.target.x) {
+              // 第二象限
+              if (d.source.y <= d.target.y) {
+                angle = -angle
+              }
+              // else {  // 第三象限
+              //   angle = angle
+              // }
+            } else if (d.source.y > d.target.y) {
+              // 第一象限
+              angle = -angle
+            }
+            return 'translate(' + x + ',' + y + ')' + 'rotate(' + angle + ')'
+          })
+
         node
           .attr("cx", d => d.x)
           .attr("cy", d => d.y)
@@ -733,9 +808,9 @@ export default {
         text.attr('transform', function(d) {
           let size = 15
           switch(d.label){
-            case 'Enterprise': break;
-            case 'Type': size = 14;break;
-            case 'Region': size = 13;break;
+            case _this.labels[0]: break;
+            case _this.labels[1]: size = 14;break;
+            case _this.labels[2]: size = 13;break;
             default: size = 12;break;
           }
           size -= 5
@@ -814,53 +889,95 @@ export default {
         // 直接通过this.selectNodeData拿到节点信息
         event.cancelBubble = true
         event.stopPropagation() // 阻止事件冒泡
+        
         const name = _this.selectNodeData.name
         _this.isNodeClicked = true
-        console.log(_this.isNodeClicked)
-        // 选择#svg1 .nodes中所有的circle，再增加个class
-        d3.select('#svg1 .nodes').selectAll('circle').attr('class', function(d) {
+        _this.changeGraphStyle(name)
+
+        return false
+      }
+    },
+    // 根据当前节点名称来更改图样式
+    changeGraphStyle (name) {
+      // console.log(this.isNodeClicked)
+      // 选择#svg1 .nodes中所有的circle，再增加个class
+      this.svgDom.select('.nodes').selectAll('circle').attr('class', d => {
+        // 节点属性name是否等于name，返回fixed（激活选中样式）
+        if(d.properties.name == name) {
+          return 'fixed'
+        }
+        // 当前节点返回空，否则其他节点循环判断是否被隐藏起来(CSS设置隐藏)
+        else {
+          // links链接的起始节点进行判断,如果其id等于name则显示这类节点
+          // 注意: graph = data
+          for (var i = 0; i < this.links.length; i++) {
+            // 如果links的起点等于name，并且终点等于正在处理的则显示
+            if (this.links[i]['source'].properties.name == name && this.links[i]['target'].id == d.id) {
+                return 'active'
+            }
+            if (this.links[i]['target'].properties.name == name && this.links[i]['source'].id == d.id) {
+                return 'active'
+            }
+          }
+          return this.isNodeClicked ? 'inactive' : ''
+        }
+      })
+      // 处理相邻的文字是否隐藏
+      this.svgDom.select('.texts').selectAll('text')
+        .attr('class', d => {
           // 节点属性name是否等于name，返回fixed（激活选中样式）
           if(d.properties.name == name) {
-            return 'fixed'
+            return ''
           }
           // 当前节点返回空，否则其他节点循环判断是否被隐藏起来(CSS设置隐藏)
           else {
             // links链接的起始节点进行判断,如果其id等于name则显示这类节点
             // 注意: graph = data
-            for (var i = 0; i < _this.links.length; i++) {
-              //如果links的起点等于name，并且终点等于正在处理的则显示
-              if (_this.links[i]['source'].properties.name == name && _this.links[i]['target'].id == d.id) {
-                  return 'active'
+            for (var i = 0; i < this.links.length; i++) {
+              // 如果links的起点等于name，并且终点等于正在处理的则显示
+              if (this.links[i]['source'].properties.name == name && this.links[i]['target'].id == d.id) {
+                  return ''
               }
-              if (_this.links[i]['target'].properties.name == name && _this.links[i]['source'].id == d.id) {
-                  return 'active'
+              if (this.links[i]['target'].properties.name == name && this.links[i]['source'].id == d.id) {
+                  return ''
               }
             }
-            return 'inactive'
+            return this.isNodeClicked ? 'inactive' : ''
           }
         })
-        //处理相邻的边line是否隐藏 注意 || 
-        d3.select("#svg1 .links").selectAll('line').attr('class', function(d) {
-            if (d.source.properties.name == name || d.target.properties.name == name) {
-                return 'active'
-            } else {
-                return 'inactive'
-            }
+      // 处理相邻的边line是否隐藏 注意 || 
+      this.svgDom.select(".links").selectAll('line')
+        .attr('class', d => {
+          if (d.source.properties.name == name || d.target.properties.name == name) {
+              return 'active'
+          } else {
+              return this.isNodeClicked ? 'inactive' : ''
+          }
         })
-
-        return false
-      }
-      function textClick (event, d) {
-        // const text = d3.select(this)
-        // console.log(text)
-        // // 获取被选中元素的名字
-        // let name = text.attr("name")
-        // 根据文本遍历节点数组，查找对应的id
-        // （参考text的mouseenter事件）
-
-        // 直接通过this.selectNodeData拿到节点信息
-        console.log(_this.selectNodeData)
-      }
+        .attr('marker-end', d => {
+          if (d.source.properties.name == name || d.target.properties.name == name) {
+            return 'url(#posActMarker)'
+          } else {
+            return 'url(#posMarker)'
+          }
+        })
+      // 处理相邻的边上文字是否隐藏 注意 || 
+      this.svgDom.select(".linkTexts").selectAll('text')
+        .attr('class', d => {
+          if (d.source.properties.name == name || d.target.properties.name == name) {
+              return 'active'
+          } else {
+              return this.isNodeClicked ? 'inactive' : ''
+          }
+        })
+    },
+    clearGraphStyle () {
+      // 移除所有样式
+      this.svgDom.select('.nodes').selectAll('circle').attr('class', '')
+      this.svgDom.select(".texts").selectAll('text').attr('class', '')
+      this.svgDom.select('.links').selectAll('line').attr('class', '').attr('marker-end', 'url(#posMarker)')
+      this.svgDom.select(".linkTexts").selectAll('text').attr('class', '')
+      // d3.select(this).attr('class', '')
     },
     drag(simulation) {
       function dragsubject(event) {
@@ -890,55 +1007,80 @@ export default {
         .on("start", dragstarted)
         .on("drag", dragged)
         .on("end", dragended)
+    },
+    // 绘制关系箭头
+    addMarkers() {
+      // 定义箭头的标识
+      var defs = this.svgDom.append("defs")
+      const posMarker = defs.append("marker")
+        .attr("id", "posMarker")
+        .attr("orient", "auto")
+        .attr("stroke-width", 2)
+        .attr("markerUnits", "strokeWidth")
+        .attr("markerUnits", "userSpaceOnUse")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 31)
+        .attr("refY", 0)
+        .attr("markerWidth", 12)
+        .attr("markerHeight", 12)
+        .append("path")
+        .attr("d", "M 0 -5 L 10 0 L 0 5")
+        .attr('fill', '#e0cac1')
+        .attr("stroke-opacity", 0.6);
+      const posActMarker = defs.append("marker")
+        .attr("id", "posActMarker")
+        .attr("orient", "auto")
+        .attr("stroke-width", 2)
+        .attr("markerUnits", "strokeWidth")
+        .attr("markerUnits", "userSpaceOnUse")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 31)
+        .attr("refY", 0)
+        .attr("markerWidth", 12)
+        .attr("markerHeight", 12)
+        .append("path")
+        .attr("d", "M 0 -5 L 10 0 L 0 5")
+        .attr('fill', '#1E90FF')
+        .attr("stroke-opacity", 0.6);
+      // const negMarker = defs.append("marker")
+      //   .attr("id","negMarker")
+      //   .attr("orient","auto")
+      //   .attr("stroke-width",2)
+      //   .attr("markerUnits", "strokeWidth")
+      //   .attr("markerUnits", "userSpaceOnUse")
+      //   .attr("viewBox", "0 -5 10 10")
+      //   .attr("refX", -25)
+      //   .attr("refY", 0)
+      //   .attr("markerWidth", 12)
+      //   .attr("markerHeight", 12)
+      //   .append("path")
+      //   .attr("d", "M 10 -5 L 0 0 L 10 5")
+      //   .attr('fill', '#999')
+      //   .attr("stroke-opacity", 0.6);
     }
   }
 }
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style lang="scss" scoped>
-  .el-select {
-    width: 120px;
-    // background-color: #fff;
-  }
-  .input-with-select .el-input-group__prepend {
-    background-color: #6ecbf3;
-  }
-</style>
 <style lang="scss">
 @import '@/plugins/d3-context-menu';
-$opacity: 0.1;  /* 显示的不透明度 */
-.graph {
-  position: relative;
-  border: 2px #000 solid;
-  background-color: #9dadc1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-h1 {
-  color: #000;
-  font-size: 32px;
-  margin-bottom: 0px;
-  text-align: center;
-  // margin-left: 40px;
-}
+$opacity: 0.15;  /* 显示的不透明度 */
+$activeColor: #1E90FF;  /* 激活的颜色 */
 svg {
   margin: 20px 0px;
-  border: 1px #000 solid;
+  // border: 1px #000 solid;
 }
 /*设置节点及边的样式*/
 .links line {
-  stroke: #bbb;
+  stroke: #e0cac1b2; // #bbb
   stroke-opacity: 1;
   &.inactive {
     /* display: none !important; */
     opacity: $opacity;
   }
   &.active {
-    stroke: rgb(58, 93, 126);
+    stroke: $activeColor;
+    stroke-width: 3px;
   }
   &.hide {
     display: none !important;
@@ -949,15 +1091,17 @@ svg {
   // stroke-width: 1.5px;
   &.fixed {
     // fill: rgb(102, 81, 81);
-    stroke: #888;
-    stroke-width: 9px;
+    stroke: #FFC0CB;  // #888;
+    stroke-width: 14px;
+    stroke-opacity: $opacity + 0.3;
+    border: 10px #000 solid;
   }
   &.inactive {
     /* display: none !important; */
     opacity: $opacity;
   }
   &.active {
-    stroke: rgb(58, 93, 126);
+    stroke: $activeColor;
     stroke-width: 4px;
   }
   &:hover {
@@ -979,10 +1123,37 @@ svg {
     opacity: $opacity;
   }
 }
+.linkTexts text {
+  stroke: #ecddd8b2; // #bbb
+  stroke-opacity: 1;
+  &.active {
+    stroke: $activeColor;
+  }
+  &.inactive {
+    /* display: none !important; */
+    opacity: $opacity;
+  }
+}
+// #positiveMarker path {
+//   fill: #fff;
+// }
+</style>
+<style lang="scss" scoped>
+@media only screen and (max-width: 1125px){
+  #info, #mode {
+    display: none !important;
+  }
+}
+.font-sky {
+  font-size: 18px;
+  color: #034c6a !important;
+}
 #indicator {
   position: absolute;
-  left: 50px;
-  bottom: 30px;
+  // left: 50px;
+  // bottom: 30px;
+  left: 3vw;
+  bottom: 2vw;
   text-align: left;
   color: #f2f2f2;
   font-size: 14px;
@@ -1001,51 +1172,54 @@ svg {
 }
 /*mode选项样式*/
 #mode {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
-		top: 200px;
-    left: 40px;
-    span {
-        display: inline-block;
-        border: 1px solid #fff;
-        color: #fff;
-        padding: 6px 10px;
-        border-radius: 4px;
-        font-size: 14px;
-        transition: color, background-color .3s;
-        -o-transition: color, background-color .3s;
-        -ms-transition: color, background-color .3s;
-        -moz-transition: color, background-color .3s;
-        -webkit-transition: color, background-color .3s;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  top: 200px;
+  left: 40px;
+  .gState span {
+    display: inline-block;
+    border: 1px solid #fff;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: color, background-color .3s;
+    -o-transition: color, background-color .3s;
+    -ms-transition: color, background-color .3s;
+    -moz-transition: color, background-color .3s;
+    -webkit-transition: color, background-color .3s;
+    ~ .active, ~ :hover {
+      background-color: #fff;
+      color: #333;
+      cursor: pointer;
     }
-    span.active, span:hover {
-        background-color: #fff;
-        color: #333;
-        cursor: pointer;
-    }
+  }
+  .gState span.active, .gState span:hover {
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+  }
 }
 /*悬浮节点的info样式*/
 #info {
-		position: absolute;
-		bottom: 40px;
-		right: 30px;
-		text-align: right;
-		width: 270px;
-}
-#info p {
-		color: #fff;
-		font-size: 12px;
-		margin-top: 0;
-		margin-bottom: 5px;
-}
-#info p span {
-		color: #888;
-		margin-right: 10px;
-}
-#info h4 {
-		color: #fff;
+  position: absolute;
+  bottom: 40px;
+  right: 30px;
+  width: 270px;
+  .node-card {
+    border: 1px solid #9faecf;
+    background-color: #00aeff6b;
+    color: #fff;
+    text-align: left;
+    // transition: background-color;
+    // transition-delay: .3s;
+    // transition-timing-function: ease;
+    .el-card__header {
+      border-bottom: 1px solid #50596d;
+    }
+  }
 }
 </style>
