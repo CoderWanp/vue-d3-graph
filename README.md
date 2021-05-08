@@ -173,11 +173,11 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 
 1. 2D图谱展示
 
-   ![2d](.\img\2d.png)
+   ![2d](img\2d.png)
 
 2. 3D图谱展示
 
-   ![3d](.\img\3d.png)
+   ![3d](img\3d.png)
 
 ## 四、关于新版d3与老版本的差异
 
