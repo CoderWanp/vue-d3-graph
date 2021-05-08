@@ -11,7 +11,20 @@
 yarn install
 ```
 
+推荐使用 `cnpm` 来安装，速度更快：
+
+```sh
+# 二选一
+npm install -g cnpm --registry=https://registry.npm.taobao.org
+npm install cnpm -g --registry=https://registry.nlark.com
+```
+
+```
+cnpm i
+```
+
 ### 2. 项目启动
+
 ```
 yarn serve
 ```
