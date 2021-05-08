@@ -96,7 +96,7 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 
 -  `gSearch.vue`
 
-  分别在data和methods属性中修改静态图数据文件的路径
+  模拟后台查询，分别在data和methods属性中修改静态图数据文件的路径
 
   ```js
   data () {
@@ -141,6 +141,8 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
   }
   ```
 
+  
+
 - `2dView.vue` 
 
   在data属性中修改图例名称、节点标签、关系标签（标签保证和Neo4j图数据中对应）
@@ -173,11 +175,11 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 
 1. 2D图谱展示
 
-   ![2d](img\2d.png)
+   ![2d](img/2d.png)
 
 2. 3D图谱展示
 
-   ![3d](img\3d.png)
+   ![3d](img/3d.png)
 
 ## 四、关于新版d3与老版本的差异
 

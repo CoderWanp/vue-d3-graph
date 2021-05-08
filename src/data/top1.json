@@ -1,0 +1,65 @@
+﻿[
+  {
+    "p": {
+"start": {
+"identity": 110531,
+"labels": [
+          "Enterprise"
+        ],
+"properties": {
+"name": "浙江鹏顺进出口有限公司",
+"setup_time": "2007/5/17",
+"address": "浙江诸暨艮塔路9号银证大厦8楼",
+"captial": "0万人民币",
+"credit_code": "3306812004868"
+        }
+      },
+"end": {
+"identity": 122725,
+"labels": [
+          "Type"
+        ],
+"properties": {
+"name": "服务型"
+        }
+      },
+"segments": [
+        {
+          "start": {
+"identity": 110531,
+"labels": [
+              "Enterprise"
+            ],
+"properties": {
+"name": "浙江鹏顺进出口有限公司",
+"setup_time": "2007/5/17",
+"address": "浙江诸暨艮塔路9号银证大厦8楼",
+"captial": "0万人民币",
+"credit_code": "3306812004868"
+            }
+          },
+          "relationship": {
+"identity": 621275,
+"start": 110531,
+"end": 122725,
+"type": "type",
+"properties": {
+"name": "类型"
+            }
+          },
+          "end": {
+"identity": 122725,
+"labels": [
+              "Type"
+            ],
+"properties": {
+"name": "服务型"
+            }
+          }
+        }
+      ],
+"length": 1.0
+    },
+    "score": 2.307142857142857
+  }
+]
