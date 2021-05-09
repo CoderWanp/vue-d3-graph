@@ -57,6 +57,8 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 - 图例交互事件
 - 文字搜索
 - 模式选择
+- 关系文字和箭头的绘制与调整
+- 节点编辑功能
 - 3D图谱展示
 
 ## 三、代码修改说明
@@ -154,7 +156,7 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
   }
   ```
 
-  
+  ![map](img/map.png)
 
 - `2dView.vue` 
 
