@@ -2,7 +2,9 @@
 
 基于之前的代码进行修改：[neo4j-d3-graph](https://github.com/CoderWanp/neo4j-d3-graph)
 
-目前只是最基础的版本，主要是提供代码的参考，后续会完善代码内容
+具体功能及效果可以参考本人博客：[vue+d3v6实现动态知识图谱可视化展示](https://blog.csdn.net/tiandao451/article/details/109708427)
+
+本人代码已被盗用，屑屑各位的肯定和认可，如果觉得项目有帮助，不妨点个star，后续会对代码作进一步完善！
 
 ## 一、代码使用说明
 
@@ -183,8 +185,6 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
   同上
 
 ## 四、代码效果展示
-
-具体功能及效果可以参考本人博客：[vue+d3v6实现动态知识图谱可视化展示](https://blog.csdn.net/tiandao451/article/details/109708427)
 
 分为2D、3D图谱展示两个页面：
 
