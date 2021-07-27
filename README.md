@@ -4,12 +4,15 @@
 
 具体功能及效果可以参考本人博客：[vue+d3v6实现动态知识图谱可视化展示](https://blog.csdn.net/tiandao451/article/details/109708427)
 
-本人代码已被盗用，屑屑各位的肯定和认可，如果觉得项目有帮助，不妨点个star，后续会对代码作进一步完善！
+本人代码已被盗用，屑屑各位的肯定和认可，如果觉得项目有帮助，可以点个star，有空会对代码作进一步完善！
 
 ## 一、代码使用说明
 
 ### 1. 依赖安装
-```
+```sh
+# 二选一
+npm i
+# yarn需要全局安装一下
 yarn install
 ```
 
@@ -21,23 +24,29 @@ npm install -g cnpm --registry=https://registry.npm.taobao.org
 npm install cnpm -g --registry=https://registry.nlark.com
 ```
 
-```
+```sh
 cnpm i
 ```
 
 ### 2. 项目启动
 
-```
+```sh
+# 二选一
+npm run serve
 yarn serve
 ```
 
 ### 3. 项目打包
-```
+```sh
+# 二选一
+npm run build
 yarn build
 ```
 
 ### 4. 使用lint检查并修复文件
-```
+```sh
+# 二选一
+npm run lint
 yarn lint
 ```
 
